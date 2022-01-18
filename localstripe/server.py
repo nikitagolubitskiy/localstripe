@@ -168,11 +168,11 @@ async def auth_middleware(request, handler):
             any(re.match(pattern, request.path) for pattern in (
                 r'^/v1/tokens$',
                 r'^/v1/sources$',
+                r'^/v1/payment_intents/\w+/confirm$',
                 r'^/v1/payment_intents/\w+/_authenticate\b',
                 r'^/v1/setup_intents/\w+/confirm$',
                 r'^/v1/setup_intents/\w+/cancel$',
             )))
-
         is_auth = get_api_key(request) is not None
 
         if request.method == 'POST':
