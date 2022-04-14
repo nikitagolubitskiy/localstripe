@@ -109,9 +109,11 @@ class Element {
                       'unmount the Element before re-mounting.');
     }
 
-    const labelSpan = document.createElement('span');
-    labelSpan.textContent = 'localstripe: ';
-    this._domChildren.push(labelSpan);
+    const localstripeLabel = document.createElement('div');
+    localstripeLabel.textContent = 'localstripe: ';
+    localstripeLabel.style.marginBottom = '1rem';
+
+    this._domChildren.push(localstripeLabel);
 
     this._inputs = {
       number: null,
@@ -120,6 +122,22 @@ class Element {
       cvc: null,
       postal_code: null,
     };
+
+    this._inputsLabels = {
+      number: 'Card number',
+      exp_month: 'Expiry month',
+      exp_year: 'Expiry year',
+      cvc: 'CVC',
+      postal_code: 'Postal code'
+    }
+
+    this._inputsPlaceholders = {
+      number: '1234 1234 1234 1234',
+      exp_month: 'MM',
+      exp_year: 'YY',
+      cvc: 'CVC',
+      postal_code: 'Postal code'
+    }
 
     const changed = event => {
       this.value = {
@@ -150,14 +168,49 @@ class Element {
     };
 
     Object.keys(this._inputs).forEach(field => {
+      const _field = document.createElement('div');
+
+      Object.assign(_field.style, {
+        display: 'flex',
+        flexDirection: 'column',
+        marginBottom: '0.75rem',
+      });
+
+      const label = document.createElement('label');
+      
+      label.innerText = this._inputsLabels[field];
+      label.setAttribute('for', field);
+
+      Object.assign(label.style, {
+        marginBottom: '0.25rem',
+      })
+
       this._inputs[field] = document.createElement('input');
+
+      Object.assign(this._inputs[field].style, {
+        padding: '12px',
+        border: '1px solid #e6e6e6',
+        backgroundColor: '#fff',
+        borderRadius: '5px',
+        transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease, color 0.15s ease',
+        boxShadow: '0px 1px 1px rgb(0 0 0 / 3%), 0px 3px 6px rgb(0 0 0 / 2%)',
+        fontSize: '16px',
+        lineHeight: '18px',
+        fontWeight: 400,
+      });
+
+      this._inputs[field].setAttribute('id', field);
       this._inputs[field].setAttribute('type', 'text');
-      this._inputs[field].setAttribute('placeholder', field);
+      this._inputs[field].setAttribute('placeholder', this._inputsPlaceholders[field]);
       this._inputs[field].setAttribute('size', field === 'number' ? 16 :
                                        field === 'postal_code' ? 5 :
                                        field === 'cvc' ? 3 : 2);
       this._inputs[field].oninput = changed;
-      this._domChildren.push(this._inputs[field]);
+
+      _field.appendChild(label);
+      _field.appendChild(this._inputs[field]);
+
+      this._domChildren.push(_field);
     });
 
     this._domChildren.forEach((child) => domElement.appendChild(child));
@@ -185,7 +238,10 @@ class Element {
 
 Stripe = (apiKey) => {
   return {
-    elements: () => {
+    clientSecret: null,
+    elements: function (options) {
+      this.clientSecret = options.clientSecret;
+
       return {
         _cardElement: null,
         create: function(type, options) {
@@ -402,6 +458,45 @@ Stripe = (apiKey) => {
     },
 
     createPaymentMethod: async () => {},
+
+    confirmPayment: async function (options) {
+      console.log('localstripe: Stripe().confirmPayment()');
+
+      try {
+        const clientSecret = this.clientSecret;
+
+        const pi = clientSecret.match(/^(pi_\w+)_secret_/)[1];
+
+        const response = await fetch(`${LOCALSTRIPE_SOURCE}/v1/payment_intents/${pi}/confirm`, {
+          method: 'POST',
+          body: JSON.stringify({
+            key: apiKey,
+            payment_method_data: {
+              type: 'card',
+              card: options.elements._cardElement.value.card,
+            },
+          }),
+        });
+
+        const body = await response.json().catch(() => ({}));
+        
+        if (response.status !== 200 || body.error) {
+          return {error: body.error};
+        } else {
+          if (body.status === 'succeeded' && options.confirmParams.return_url) {
+            window.location = options.confirmParams.return_url;
+          }
+
+          return {paymentIntent: body};
+        }
+      } catch (err) {
+        if (typeof err === 'object' && err.error) {
+          return err;
+        } else {
+          return {error: err};
+        }
+      }
+    },
   };
 };
 

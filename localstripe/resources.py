@@ -17,6 +17,7 @@
 import asyncio
 from datetime import datetime, timedelta
 import hashlib
+from importlib.metadata import metadata
 import pickle
 import random
 import re
@@ -27,7 +28,6 @@ from dateutil.relativedelta import relativedelta
 
 from .errors import UserError
 from .webhooks import schedule_webhook
-
 
 # Save built-in keyword `type`, because some classes override it by using
 # `type` as a method argument:
@@ -325,7 +325,6 @@ class BalanceTransaction(StripeObject):
         super().__init__()
 
         self.amount = amount
-        self.available_on = self.created
         self.currency = currency
         self.description = description
         self.exchange_rate = exchange_rate
@@ -773,6 +772,8 @@ class Customer(StripeObject):
         self.preferred_locales = preferred_locales
         self.metadata = metadata or {}
         self.account_balance = 0
+        self.balance = 0
+        self._currency = 'eur'
         self.delinquent = False
         self.discount = None
         self.shipping = None
@@ -801,7 +802,11 @@ class Customer(StripeObject):
         source = self._get_default_payment_method_or_source()
         if isinstance(source, Source):  # not Card
             return source.currency
-        return 'eur'  # arbitrary default
+        return self._currency  # arbitrary default
+
+    @currency.setter
+    def currency(self, value):
+        self._currency = value
 
     @property
     def subscriptions(self):
@@ -989,6 +994,15 @@ class Customer(StripeObject):
                                  'subscription with ID ' + subscription_id)
 
         return Subscription._api_update(subscription_id, **data)
+    
+    @classmethod
+    def _update_balance(cls, id, amount, currency):
+        obj = cls._api_retrieve(id)
+
+        obj.balance = obj.balance + amount
+        obj.currency = currency
+
+        return obj
 
 
 extra_apis.extend((
@@ -1015,6 +1029,70 @@ extra_apis.extend((
     ('POST', '/v1/customers/{id}/cards', Customer._api_add_source),
     ('POST', '/v1/customers/{id}/tax_ids', Customer._api_add_tax_id),
     ('GET', '/v1/customers/{id}/tax_ids', Customer._api_list_tax_ids)))
+
+
+class CustomerBalanceTransaction(StripeObject):
+    object = 'customer_balance_transaction'
+    _id_prefix = 'cbtxn_'
+
+    def __init__(self, customer=None, amount=None, 
+                currency=None, description=None, 
+                metadata=None, **kwargs):
+        if kwargs:
+            raise UserError(400, 'Unexpected ' + ', '.join(kwargs.keys()))
+
+        amount = try_convert_to_int(amount)
+        
+        try:
+            assert _type(customer) is str and customer.startswith('cus_')
+            assert _type(amount) is int
+            assert _type(currency) is str and currency
+            assert description is None or _type(description) is str
+            assert metadata is None or _type(metadata) is dict
+        except AssertionError:
+            raise UserError(400, 'Bad request')
+
+        super().__init__(getattr(self, '_id_prefix') + random_id(24))
+
+        self.customer = customer
+        self.amount = amount
+        self.currency = currency
+        self.description = description
+        self.created = int(time.time())
+        self.credit_note = None
+        self.ending_balance = amount
+        self.invoice = None
+        self.livemode = False
+        self.metadata = metadata
+        self.type = 'adjustment'
+
+        Customer._update_balance(customer, amount, currency)
+
+    @classmethod
+    def _api_create(cls, id, **data):
+        return cls(id, **data)
+
+    @classmethod
+    def _api_list_all(cls, id, limit=None, starting_after=None, **kwargs):
+        url = '/v1/customers/' + id + '/balance_transactions'
+        
+        list = [
+            customer_transaction for customer_transaction 
+            in super()._api_list_all(url, limit, starting_after, **kwargs)._list 
+            if customer_transaction.customer == id
+        ]
+
+        result = List(url, limit, starting_after)
+        setattr(result, 'data', list)
+        return result
+
+
+extra_apis.extend((
+    ('POST', '/v1/customers/{id}/balance_transactions', 
+     CustomerBalanceTransaction._api_create),
+     ('GET', '/v1/customers/{id}/balance_transactions', 
+     CustomerBalanceTransaction._api_list_all)
+))
 
 
 class Event(StripeObject):
@@ -1721,6 +1799,10 @@ class List(StripeObject):
         return [item._export() for item in self._list[
             self._starting_pos:self._starting_pos + self._limit
         ]]
+    
+    @data.setter
+    def data(self, value):
+        self._list = value
 
     @property
     def total_count(self):
@@ -1750,7 +1832,8 @@ class PaymentIntent(StripeObject):
     _id_prefix = 'pi_'
 
     def __init__(self, amount=None, currency=None, customer=None,
-                 payment_method=None, metadata=None, **kwargs):
+                 payment_method=None, metadata=None, setup_future_usage=None,
+                automatic_payment_methods=None, **kwargs):
         if kwargs:
             raise UserError(400, 'Unexpected ' + ', '.join(kwargs.keys()))
 
@@ -1766,6 +1849,8 @@ class PaymentIntent(StripeObject):
                 assert (payment_method.startswith('pm_') or
                         payment_method.startswith('src_') or
                         payment_method.startswith('card_'))
+            assert setup_future_usage is None or _type(setup_future_usage) is str
+            assert automatic_payment_methods is None or _type(automatic_payment_methods) is dict
         except AssertionError:
             raise UserError(400, 'Bad request')
 
@@ -1787,6 +1872,8 @@ class PaymentIntent(StripeObject):
         self.metadata = metadata or {}
         self.invoice = None
         self.next_action = None
+        self.setup_future_usage = setup_future_usage
+        self.automatic_payment_methods = automatic_payment_methods
 
         self._canceled = False
         self._authentication_failed = False
@@ -1799,16 +1886,22 @@ class PaymentIntent(StripeObject):
             if self.invoice:
                 invoice = Invoice._api_retrieve(self.invoice)
                 invoice._on_payment_success()
+            
+            schedule_webhook(Event('payment_intent.succeeded', self))
 
         def on_failure_now():
             if self.invoice:
                 invoice = Invoice._api_retrieve(self.invoice)
                 invoice._on_payment_failure_now()
+            
+            schedule_webhook(Event('payment_intent.payment_failed', self))
 
         def on_failure_later():
             if self.invoice:
                 invoice = Invoice._api_retrieve(self.invoice)
                 invoice._on_payment_failure_later()
+            
+            schedule_webhook(Event('payment_intent.payment_failed', self))
 
         charge = Charge(amount=self.amount,
                         currency=self.currency,
@@ -1873,7 +1966,7 @@ class PaymentIntent(StripeObject):
         return obj
 
     @classmethod
-    def _api_confirm(cls, id, payment_method=None, **kwargs):
+    def _api_confirm(cls, id, payment_method=None, payment_method_data=None, **kwargs):
         if kwargs:
             raise UserError(400, 'Unexpected ' + ', '.join(kwargs.keys()))
 
@@ -1884,8 +1977,12 @@ class PaymentIntent(StripeObject):
             assert type(id) is str and id.startswith('pi_')
         except AssertionError:
             raise UserError(400, 'Bad request')
-
         obj = cls._api_retrieve(id)
+
+        if payment_method_data is not None:
+            if obj.status == 'requires_payment_method':
+                payment_method = PaymentMethod._api_create(**payment_method_data)
+                obj.payment_method = payment_method.id
 
         if obj.status != 'requires_confirmation':
             raise UserError(400, 'Bad request')
