@@ -17,7 +17,6 @@
 import asyncio
 from datetime import datetime, timedelta
 import hashlib
-from importlib.metadata import metadata
 import pickle
 import random
 import re
@@ -325,6 +324,7 @@ class BalanceTransaction(StripeObject):
         super().__init__()
 
         self.amount = amount
+        self.available_on = self.created
         self.currency = currency
         self.description = description
         self.exchange_rate = exchange_rate
