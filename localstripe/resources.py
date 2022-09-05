@@ -1004,6 +1004,15 @@ class Customer(StripeObject):
 
         return obj
 
+    @classmethod
+    def _api_list_payment_methods(cls, id, type=None, limit=None,
+                      starting_after=None):
+        url = '/v1/customers/' + id + '/payment_methods'
+
+        payment_methods = PaymentMethod._api_list_all(url, id, type, limit, starting_after)
+
+        return payment_methods
+
 
 extra_apis.extend((
     ('GET', '/v1/customers/{id}/sources', Customer._api_list_sources),
@@ -1028,7 +1037,8 @@ extra_apis.extend((
     # This is the old API route:
     ('POST', '/v1/customers/{id}/cards', Customer._api_add_source),
     ('POST', '/v1/customers/{id}/tax_ids', Customer._api_add_tax_id),
-    ('GET', '/v1/customers/{id}/tax_ids', Customer._api_list_tax_ids)))
+    ('GET', '/v1/customers/{id}/tax_ids', Customer._api_list_tax_ids),
+    ('GET', '/v1/customers/{id}/payment_methods', Customer._api_list_payment_methods)))
 
 
 class CustomerBalanceTransaction(StripeObject):
@@ -1833,7 +1843,8 @@ class PaymentIntent(StripeObject):
 
     def __init__(self, amount=None, currency=None, customer=None,
                  payment_method=None, metadata=None, setup_future_usage=None,
-                automatic_payment_methods=None, **kwargs):
+                automatic_payment_methods=None, payment_method_options=None, 
+                return_url=None, **kwargs):
         if kwargs:
             raise UserError(400, 'Unexpected ' + ', '.join(kwargs.keys()))
 
@@ -1982,6 +1993,7 @@ class PaymentIntent(StripeObject):
         if payment_method_data is not None:
             if obj.status == 'requires_payment_method':
                 payment_method = PaymentMethod._api_create(**payment_method_data)
+                payment_method.customer = obj.customer
                 obj.payment_method = payment_method.id
 
         if obj.status != 'requires_confirmation':
@@ -2065,7 +2077,7 @@ class PaymentMethod(StripeObject):
     _id_prefix = 'pm_'
 
     def __init__(self, type=None, billing_details=None, card=None,
-                 sepa_debit=None, metadata=None, **kwargs):
+                 sepa_debit=None, metadata=None, customer=None, **kwargs):
         if kwargs:
             raise UserError(400, 'Unexpected ' + ', '.join(kwargs.keys()))
 
@@ -2129,7 +2141,10 @@ class PaymentMethod(StripeObject):
                 'mandate_url': 'https://fake/NXDSYREGC9PSMKWY',
             }
 
-        self.customer = None
+        if customer:
+            Customer._api_retrieve(customer) # 404 if not found
+
+        self.customer = customer
         self.metadata = metadata or {}
 
     def _requires_authentication(self):
