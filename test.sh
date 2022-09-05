@@ -16,7 +16,16 @@ curl -sSfg -u $SK: $HOST/v1/customers/$cus \
 curl -sSfg -u $SK: $HOST/v1/customers/$cus \
      -d preferred_locales[]='fr-FR' -d preferred_locales[]='es-ES'
 
+cusB=$(curl -sSfg -u $SK: $HOST/v1/customers \
+            -d email=george.carlin@example.com \
+       | grep -oE 'cus_\w+' | head -n 1)
+
+email=$(curl -sSfg -u $SK: $HOST/v1/customers?email=james.robinson@example.com \
+        | grep -oE '"email": "james.robinson@example.com",')
+[ -n "$email" ]
+
 curl -sSfg -u $SK: -X DELETE $HOST/v1/customers/$cus
+curl -sSfg -u $SK: -X DELETE $HOST/v1/customers/$cusB
 
 cus=$(curl -sSfg -u $SK: $HOST/v1/customers \
            -d description='This customer is a company' \
@@ -783,17 +792,17 @@ status=$(
 
 # list charges
 total_count=$(
-  curl -sSfg -u $SK: $HOST/v1/charges | grep -oE '"total_count": 15')
+  curl -sSfg -u $SK: $HOST/v1/charges | grep -oE '"total_count": 15,')
 [ -n "$total_count" ]
 
 total_count=$(
   curl -sSfg -u $SK: $HOST/v1/charges?customer=$cus \
-  | grep -oE '"total_count": 6')
+  | grep -oE '"total_count": 6,')
 [ -n "$total_count" ]
 
 total_count=$(
   curl -sSfg -u $SK: $HOST/v1/charges?customer=$cus\&created[gt]=1588166306 \
-  | grep -oE '"total_count": 6')
+  | grep -oE '"total_count": 6,')
 [ -n "$total_count" ]
 
 no_more_events=$(curl -sSfg -u $SK: $HOST/v1/events \
@@ -914,7 +923,7 @@ card=$(curl -sSfg -u $SK: $HOST/v1/payment_methods?customer=$cus\&type=card \
 
 # trying to create a customer with a non-existant payment_method returns a 404, and doesn't create customer
 total_count=$( curl -sSfg -u $SK: $HOST/v1/customers \
-             | grep -oE '"total_count": 9')
+             | grep -oE '"total_count": 9,')
 [ -n "$total_count" ]
 
 code=$(curl -sg -o /dev/null -w '%{http_code}' -u $SK: $HOST/v1/customers \
@@ -923,5 +932,5 @@ code=$(curl -sg -o /dev/null -w '%{http_code}' -u $SK: $HOST/v1/customers \
 [ "$code" -eq 404 ]
 
 total_count=$( curl -sSfg -u $SK: $HOST/v1/customers \
-             | grep -oE '"total_count": 9')
+             | grep -oE '"total_count": 9,')
 [ -n "$total_count" ]
