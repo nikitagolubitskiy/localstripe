@@ -68,20 +68,20 @@ curl -sSfg -u $SK: $HOST/v1/plans \
    -d id=basique-mensuel \
    -d product[name]='Abonnement basique (mensuel)' \
    -d amount=2500 \
-   -d currency=eur \
+   -d currency=gbp \
    -d interval=month
 
 curl -sSfg -u $SK: $HOST/v1/plans \
    -d id=basique-annuel \
    -d name='Abonnement basique (annuel)' \
    -d amount=20000 \
-   -d currency=eur \
+   -d currency=gbp \
    -d interval=year
 
 curl -sSfg -u $SK: $HOST/v1/plans \
    -d id=annual-tiered-volume \
    -d name='Annual tiered volume' \
-   -d currency=eur \
+   -d currency=gbp \
    -d interval=year \
    -d interval_count=1 \
    -d usage_type=licensed \
@@ -97,7 +97,7 @@ curl -sSfg -u $SK: $HOST/v1/plans \
 curl -sSfg -u $SK: $HOST/v1/plans \
    -d id=monthly-tiered-graduated \
    -d name='Monthly tiered graduated' \
-   -d currency=eur \
+   -d currency=gbp \
    -d interval=month \
    -d interval_count=1 \
    -d usage_type=licensed \
@@ -115,21 +115,21 @@ curl -sSfg -u $SK: $HOST/v1/plans \
    -d product[name]='Abonnement PRO (annuel)' \
    -d product[statement_descriptor]='abonnement pro' \
    -d amount=30000 \
-   -d currency=eur \
+   -d currency=gbp \
    -d interval=year
 
 curl -sSfg -u $SK: $HOST/v1/plans \
    -d product[name]='Without id' \
    -d product[statement_descriptor]='Without id' \
    -d amount=30000 \
-   -d currency=eur \
+   -d currency=gbp \
    -d interval=year
 
 curl -sSfg -u $SK: $HOST/v1/plans \
    -d id=delete-me \
    -d product[name]='Delete me' \
    -d amount=30000 \
-   -d currency=eur \
+   -d currency=gbp \
    -d interval=year
 
 curl -sSfg -u $SK: -X DELETE $HOST/v1/plans/delete-me
@@ -381,7 +381,7 @@ curl -sSfg -u $SK: $HOST/v1/customers/$sepa_cus/sources \
 src=$(curl -sSfg -u $SK: $HOST/v1/sources \
            -d type=sepa_debit \
            -d sepa_debit[iban]=DE89370400440532013000 \
-           -d currency=eur \
+           -d currency=gbp \
            -d owner[name]='Jenny Rosen' \
       | grep -oE 'src_\w+')
 
@@ -636,7 +636,7 @@ fingerprint=$(
   curl -sSfg -u $SK: $HOST/v1/sources \
        -d type=sepa_debit \
        -d sepa_debit[iban]=DE89370400440532013000 \
-       -d currency=eur \
+       -d currency=gbp \
   | grep -oE '"fingerprint": "798619b2da10a84a",')
 [ -n "$fingerprint" ]
 
@@ -644,7 +644,7 @@ fingerprint=$(
   curl -sSfg -u $SK: $HOST/v1/sources \
        -d type=sepa_debit \
        -d sepa_debit[iban]=FR1420041010050500013M02606 \
-       -d currency=eur \
+       -d currency=gbp \
   | grep -oE '"fingerprint": "ecd0b2a2a3c26824",')
 [ -n "$fingerprint" ]
 
@@ -652,7 +652,7 @@ fingerprint=$(
   curl -sSfg -u $SK: $HOST/v1/sources \
        -d type=sepa_debit \
        -d sepa_debit[iban]=IT40S0542811101000000123456 \
-       -d currency=eur \
+       -d currency=gbp \
   | grep -oE '"fingerprint": "b4fb3b3b13ef1fb0",')
 [ -n "$fingerprint" ]
 
@@ -822,7 +822,7 @@ curl -sSfg -u $SK: $HOST/v1/balance
 payout=$(
   curl -sSfg -u $SK: $HOST/v1/payouts \
        -d amount=1100 \
-       -d currency=eur \
+       -d currency=gbp \
   | grep -oE 'po_\w+' | head -n 1)
 
 payout_status=$(
@@ -839,12 +839,12 @@ payout_status=$(
 
 curl -sg -u $SK: $HOST/v1/payouts \
       -d amount=1100 \
-      -d currency=eur \
+      -d currency=gbp \
       -d status=paid
 
 curl -sg -u $SK: $HOST/v1/payouts \
       -d amount=1100 \
-      -d currency=eur \
+      -d currency=gbp \
       -d status=failed
 
 card=$(

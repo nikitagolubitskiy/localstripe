@@ -250,14 +250,14 @@ class Balance(object):
         self.livemode = False
         self.available = {
             'amount': 2000,
-            'currency': 'eur',
+            'currency': 'gbp',
             'source_types': {
                 'card': 2000
             }
         }
         self.pending = {
             'amount': 0,
-            'currency': 'eur',
+            'currency': 'gbp',
             'source_types': {
                 'card': 0
             }
@@ -773,7 +773,7 @@ class Customer(StripeObject):
         self.metadata = metadata or {}
         self.account_balance = 0
         self.balance = 0
-        self._currency = 'eur'
+        self._currency = None
         self.delinquent = False
         self.discount = None
         self.shipping = None
@@ -1246,7 +1246,7 @@ class Invoice(StripeObject):
         if len(self.lines._list):
             self.currency = self.lines._list[0].currency
         else:
-            self.currency = 'eur'  # arbitrary default
+            self.currency = 'gbp'  # arbitrary default
 
         self._draft = True
         self._voided = False
@@ -2097,7 +2097,8 @@ class PaymentMethod(StripeObject):
     _id_prefix = 'pm_'
 
     def __init__(self, type=None, billing_details=None, card=None,
-                 sepa_debit=None, metadata=None, customer=None, **kwargs):
+                 sepa_debit=None, metadata=None, customer=None, 
+                 **kwargs):
         if kwargs:
             raise UserError(400, 'Unexpected ' + ', '.join(kwargs.keys()))
 
@@ -2250,7 +2251,7 @@ class PaymentMethod(StripeObject):
                       starting_after=None):
         try:
             assert _type(customer) is str and customer.startswith('cus_')
-            assert type in ('card', )
+            assert type in ('card', 'bacs_debit')
         except AssertionError:
             raise UserError(400, 'Bad request')
 
@@ -2396,7 +2397,7 @@ class Payout(StripeObject):
         amount = try_convert_to_int(amount)
         try:
             assert type(amount) is int and amount > 0
-            assert currency in ('eur',)
+            assert currency in ('gbp',)
             if description is not None:
                 assert type(description) is str
             if metadata is not None:

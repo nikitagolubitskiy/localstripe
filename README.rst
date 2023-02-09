@@ -78,7 +78,7 @@ subscribe the latter to the former:
  curl localhost:8420/v1/plans -u sk_test_12345: \
       -d id=pro-plan \
       -d amount=2500 \
-      -d currency=eur \
+      -d currency=gbp \
       -d interval=month \
       -d name="Plan for professionals"
 
@@ -87,7 +87,7 @@ subscribe the latter to the former:
  {
    "amount": 2500,
    "created": 1504187388,
-   "currency": "eur",
+   "currency": "gbp",
    "id": "pro-plan",
    "interval": "month",
    "interval_count": 1,
@@ -110,7 +110,7 @@ subscribe the latter to the former:
    "id": "cus_b3IecP7GlNCPMM",
    "description": "Customer for david.anderson@example.com",
    "account_balance": 0,
-   "currency": "eur",
+   "currency": "gbp",
    "default_source": null,
    ...
  }
@@ -156,7 +156,7 @@ Now if you retrieve that customer again, it has an associated subscription:
                  "id": "pro-plan",
                  "name": "Plan for professionals",
                  "amount": 2500,
-                 "currency": "eur",
+                 "currency": "gbp",
                  "interval": "month",
    ...
  }
